@@ -1,0 +1,58 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>v23</title>
+<style>#r{font:15px/1.15 monospace;white-space:pre-wrap;margin:4px;word-break:break-all}</style>
+</head><body><div id="r">v23</div>
+<script>
+var R=document.getElementById('r');
+function L(s){R.textContent+='\n'+String(s);}
+function sleepRaf(ms){return new Promise(function(res){var t0=performance.now();(function tick(t){if(t-t0>=ms)res();else requestAnimationFrame(tick);})(performance.now());});}
+async function F(tag,url,opt){
+  opt=opt||{}; opt.mode='cors';
+  var c=new AbortController(); var to=setTimeout(function(){c.abort();},10000); opt.signal=c.signal;
+  try{
+    var r=await fetch(url,opt); clearTimeout(to);
+    var t=await r.text();
+    L(tag+' ST'+r.status+' B='+t.replace(/\s+/g,' ').slice(0,400));
+  }catch(e){ clearTimeout(to); L(tag+' ERR '+e.message); }
+}
+async function main(){
+  var tok=(location.hash||'').replace(/^#/,'');
+  L('tok='+(tok?tok.length:'NO'));
+  var KEY='dc-prod-virgoweb';
+  var H=function(extra){return Object.assign({'x-api-key':KEY,'Authorization':'Bearer '+tok}, extra||{});};
+  var jobs=[];
+  // Edge directory / index
+  jobs.push(F('edge_root','https://platform-cs-edge-jpn3.adobe.io/',{headers:H()}));
+  jobs.push(F('edge_index','https://platform-cs-edge.adobe.io/index',{headers:H({'Accept':'application/vnd.adobecloud.index+json'})}));
+  // Collection assets list
+  jobs.push(F('col','https://platform-cs-edge-jpn3.adobe.io/dckwcs/1785845424/kwcollections/urn%3Aaaid%3Asc%3AAP%3Af908ffd5-2a5b-4524-85bc-9701f66858d2?publicId=kwc_curated',{headers:H({'Accept':'application/vnd.adobe.dc+json;profile="https://dc-kwcollection.adobe.io/schemas/kwcollection_v1.json"'})}));
+  // Conversation history service
+  jobs.push(F('conv','https://dc-conversationhistory-jpn3.adobe.io/',{headers:H()}));
+  jobs.push(F('conv_va6','https://dc-conversationhistory-va6.adobe.io/',{headers:H()}));
+  // GenAI content platform
+  jobs.push(F('genai','https://dc-genai-content-platform-v2-jpn3.adobe.io/',{headers:H()}));
+  jobs.push(F('genai_sess','https://dc-genai-content-platform-v2-jpn3.adobe.io/kwcollections/session',{headers:H({'Accept':'application/json'})}));
+  // Storage - user home
+  jobs.push(F('stor','https://cc-api-storage.adobe.io/',{headers:H()}));
+  jobs.push(F('stor_id','https://cc-api-storage.adobe.io/id',{headers:H()}));
+  // Invitations
+  jobs.push(F('inv','https://invitations.adobe.io/api/v4/invitations',{headers:H({'Accept':'application/json'})}));
+  // IMS profile full
+  jobs.push(F('prof','https://ims-na1.adobelogin.com/ims/profile/v1?client_id='+KEY,{headers:{'Authorization':'Bearer '+tok}}));
+  jobs.push(F('ui','https://ims-na1.adobelogin.com/ims/userinfo/v1?client_id='+KEY,{headers:{'Authorization':'Bearer '+tok}}));
+  // CPS content storage path
+  jobs.push(F('cps','https://platform-cs-jpn3.adobe.io/content/storage/',{headers:H()}));
+  // Limits / features
+  jobs.push(F('lim','https://dc-genai-access-provisioning-api.adobe.io/users/ai/limits',{headers:H({'Accept':'application/vnd.adobe.dc+json; profile="https://dc-genai-access-provisioning-api.adobe.io/schemas/limits_v2.json"'})}));
+  jobs.push(F('feat','https://dc-genai-access-provisioning-api.adobe.io/users/ai/features',{headers:H({'Accept':'application/json'})}));
+  // Discovery full
+  jobs.push(F('disc','https://dcdiscovery.adobe.io/1785845424/index',{headers:H({'Accept':'application/json'})}));
+  // KWC list via edge
+  jobs.push(F('kwc_list','https://platform-cs-edge-jpn3.adobe.io/dckwcs/1785845424/kwcollections?publicId=kwc_curated',{headers:H({'Accept':'application/vnd.adobe.dc+json;profile="https://dc-kwcollection.adobe.io/schemas/kwcollection_list_v1.json"'})}));
+  await Promise.allSettled(jobs);
+  L('===ALL===');
+  await sleepRaf(2000);
+  L('===DONE===');
+}
+main();
+setTimeout(function(){L('T10');},11000);
+</script></body></html>
