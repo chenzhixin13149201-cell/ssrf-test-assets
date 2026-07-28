@@ -1,0 +1,47 @@
+<html><body><div id="r" style="font:12px monospace;white-space:pre-wrap"></div>
+<script>
+var R=document.getElementById('r');
+function L(s){R.textContent+=s+'\n';}
+var KEY='dc-prod-virgoweb';
+var targets=[
+  // API-key only candidates (no bearer)
+  ['edge_root_key','https://platform-cs-edge-jpn3.adobe.io/?api_key='+KEY],
+  ['edge_root_hdr','https://platform-cs-edge-jpn3.adobe.io/',{headers:{'x-api-key':KEY}}],
+  ['stor_key','https://cc-api-storage.adobe.io/?api_key='+KEY],
+  ['inv_ar_key','https://invitations.adobe.io/api/v4/users/self/accessrequests?api_key='+KEY],
+  ['links_key','https://adobeioruntime.net/api/v1/web/Platform-C3/default/links?api_key='+KEY],
+  ['dc_limits_key','https://dc-genai-access-provisioning-api.adobe.io/users/ai/limits?api_key='+KEY],
+  ['sensei_key','https://senseicore-ue1.adobe.io/?api_key='+KEY],
+  ['cps_key','https://cps-select-ue1.adobe.io/?api_key='+KEY],
+  ['files_key','https://files.acrobat.com/?api_key='+KEY],
+  ['cctypekit','https://typekit.com/api/v1/json/libraries?api_key='+KEY],
+  ['stock','https://stock.adobe.io/Rest/Media/1/Files?api_key='+KEY],
+  ['userman','https://usermanagement.adobe.io/v2/usermanagement/organizations?api_key='+KEY],
+  ['lcs','https://lcs-cops.adobe.io/?api_key='+KEY],
+  ['ccx','https://ccx-web.adobe.io/?api_key='+KEY],
+  ['comments','https://comments.adobe.io/?api_key='+KEY],
+];
+L('v30_api_key_only '+location.host);
+var done=0;
+targets.forEach(function(t){
+  var name=t[0], url=t[1], opts=Object.assign({mode:'cors'}, t[2]||{});
+  var t0=Date.now();
+  fetch(url, opts).then(function(r){
+    return r.text().then(function(b){
+      L(name+' ST'+r.status+' t'+(Date.now()-t0)+' '+b.substring(0,180).replace(/\s+/g,' '));
+      done++;
+    });
+  }).catch(function(e){
+    L(name+' ERR t'+(Date.now()-t0)+' '+e.message);
+    done++;
+  });
+});
+// wait async
+var start=Date.now();
+function tick(){
+  if(done>=targets.length || Date.now()-start>14000){ L('DONE '+done+'/'+targets.length); return; }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+setTimeout(function(){L('TMO done='+done);},14500);
+</script></body></html>

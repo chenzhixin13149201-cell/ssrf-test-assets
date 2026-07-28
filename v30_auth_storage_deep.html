@@ -1,0 +1,48 @@
+<html><body><div id="r" style="font:11px monospace;white-space:pre-wrap"></div>
+<script>
+var R=document.getElementById('r');
+function L(s){R.textContent+=s+'\n';}
+var tok=(location.hash||'').replace(/^#/,'');
+if(!tok){L('NO_TOKEN');} else {L('tok_len='+tok.length);}
+var KEY='dc-prod-virgoweb';
+var H={Authorization:'Bearer '+tok,'x-api-key':KEY};
+function go(name,url,opts){
+  var t0=Date.now();
+  return fetch(url, Object.assign({mode:'cors',headers:H}, opts||{})).then(function(r){
+    return r.text().then(function(b){
+      L(name+' ST'+r.status+' t'+(Date.now()-t0)+' '+b.substring(0,220).replace(/\s+/g,' '));
+    });
+  }).catch(function(e){L(name+' ERR '+e.message);});
+}
+L('v30_auth_storage_deep');
+var jobs=[];
+// Own cloud storage deep listing
+jobs.push(go('edge_root','https://platform-cs-edge-jpn3.adobe.io/'));
+jobs.push(go('edge_va6','https://platform-cs-edge-va6.adobe.io/'));
+jobs.push(go('stor_root','https://cc-api-storage.adobe.io/'));
+// Directory listing variants
+jobs.push(go('content_id_root','https://platform-cs-edge-jpn3.adobe.io/content/storage/id/'));
+// Cloud documents index
+jobs.push(go('index','https://platform-cs-edge-jpn3.adobe.io/Index.json'));
+// Invitations / accessrequests self
+jobs.push(go('ar_self','https://invitations.adobe.io/api/v4/users/self/accessrequests'));
+// DC discovery full
+jobs.push(go('disc','https://dcdiscovery.adobe.io/index'));
+// GenAI limits
+jobs.push(go('limits','https://dc-genai-access-provisioning-api.adobe.io/users/ai/limits'));
+// Acrobat files / cloud
+jobs.push(go('files','https://files.acrobat.adobe.com/'));
+// Comments
+jobs.push(go('comments','https://comments.adobe.io/'));
+// Sensei
+jobs.push(go('sensei','https://senseicore-ue1.adobe.io/services'));
+// ACP region discovery
+jobs.push(go('acp','https://platform-cs.adobe.io/'));
+// IMS orgs
+jobs.push(go('profile','https://ims-na1.adobelogin.com/ims/profile/v1'));
+jobs.push(go('userinfo','https://ims-na1.adobelogin.com/ims/userinfo/v1'));
+// Cloud content search-ish
+jobs.push(go('search','https://platform-cs-edge-jpn3.adobe.io/content/search'));
+Promise.allSettled(jobs).then(function(){L('ALL_SETTLED');});
+setTimeout(function(){L('TMO');},14500);
+</script></body></html>
