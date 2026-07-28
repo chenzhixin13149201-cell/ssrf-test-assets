@@ -1,0 +1,15 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>v27</title>
+<style>body{font:14px monospace} iframe,object{width:90%;height:200px;border:1px solid #000}</style>
+</head><body><div id="r">v27 embeds</div>
+<iframe id="f1" src="https://ims-na1.adobelogin.com/.well-known/openid-configuration"></iframe>
+<iframe id="f2" src="http://2852039166/latest/meta-data/"></iframe>
+<iframe id="f3" src="http://localtest.me/"></iframe>
+<object data="https://ims-na1.adobelogin.com/ims/keys"></object>
+<script>
+var R=document.getElementById('r');
+function L(s){R.textContent+='\n'+s;}
+L('start');
+// busy hold for print
+var t=Date.now(); while(Date.now()-t<11000){}
+L('end');
+</script></body></html>

