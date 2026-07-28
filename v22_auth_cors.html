@@ -1,0 +1,70 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>v22</title>
+<style>
+html,body{margin:0;padding:0}
+#r{font:16px/1.2 monospace;white-space:pre-wrap;margin:6px;word-break:break-all}
+</style></head>
+<body>
+<div id="r">v22 boot</div>
+<script>
+// CRITICAL: never set textContent on body (it serializes <script> source into visible text)
+var R=document.getElementById('r');
+function L(s){R.textContent += '\n'+String(s);}
+function sleepRaf(ms){
+  return new Promise(function(res){
+    var t0=performance.now();
+    function tick(t){ if(t-t0>=ms) res(); else requestAnimationFrame(tick); }
+    requestAnimationFrame(tick);
+  });
+}
+async function F(tag,url,opt){
+  opt=opt||{}; opt.mode='cors';
+  var c=new AbortController();
+  var to=setTimeout(function(){c.abort();},9000);
+  opt.signal=c.signal;
+  try{
+    var r=await fetch(url,opt);
+    clearTimeout(to);
+    var t=await r.text();
+    var hs=[];
+    try{r.headers.forEach(function(v,k){if(/x-|server|content-type|www-auth|allow|request|etag/i.test(k))hs.push(k+':'+String(v).slice(0,50));});}catch(e){}
+    L(tag+' ST'+r.status+' H['+hs.join(';')+'] B='+t.replace(/\s+/g,' ').slice(0,320));
+  }catch(e){
+    clearTimeout(to);
+    L(tag+' ERR '+e.message);
+  }
+}
+async function main(){
+  L('UA '+navigator.userAgent.slice(0,100));
+  L('cores '+navigator.hardwareConcurrency+' mem '+navigator.deviceMemory);
+  // Token from hash fragment (not sent to GitHub)
+  var tok=(location.hash||'').replace(/^#/,'');
+  if(!tok){ L('NO_TOKEN'); } else { L('tok.len='+tok.length+' head='+tok.slice(0,16)); }
+  var KEY='dc-prod-virgoweb';
+  var H0={'x-api-key':KEY};
+  var Hauth={'x-api-key':KEY,'Authorization':'Bearer '+tok};
+  var Hacc=Object.assign({},Hauth,{'Accept':'application/vnd.adobe.dc+json;profile="https://dc-kwcollection.adobe.io/schemas/kwcollection_v1.json"'});
+  var Hlim=Object.assign({},Hauth,{'Accept':'application/vnd.adobe.dc+json; profile="https://dc-genai-access-provisioning-api.adobe.io/schemas/limits_v2.json"'});
+  var Hjson=Object.assign({},Hauth,{'Accept':'application/json'});
+  var jobs=[];
+  jobs.push(F('edge0','https://platform-cs-edge-jpn3.adobe.io/',{headers:H0}));
+  jobs.push(F('edge_auth','https://platform-cs-edge-jpn3.adobe.io/',{headers:Hauth}));
+  jobs.push(F('col_auth','https://platform-cs-edge-jpn3.adobe.io/dckwcs/1785845424/kwcollections/urn%3Aaaid%3Asc%3AAP%3Af908ffd5-2a5b-4524-85bc-9701f66858d2?publicId=kwc_curated',{headers:Hacc}));
+  jobs.push(F('disc_auth','https://dcdiscovery.adobe.io/1785845424/index',{headers:Hjson}));
+  jobs.push(F('lim_auth','https://dc-genai-access-provisioning-api.adobe.io/users/ai/limits',{headers:Hlim}));
+  jobs.push(F('stor_auth','https://cc-api-storage.adobe.io/',{headers:Hauth}));
+  jobs.push(F('ims_ui','https://ims-na1.adobelogin.com/ims/userinfo/v1?client_id='+KEY,{headers:{'Authorization':'Bearer '+tok}}));
+  jobs.push(F('cps_auth','https://platform-cs-jpn3.adobe.io/',{headers:Hauth}));
+  // PNA should block these from public origin
+  jobs.push(F('pna_lo','http://127.0.0.1/',{}));
+  jobs.push(F('pna_imds','http://169.254.169.254/latest/meta-data/',{}));
+  await Promise.allSettled(jobs);
+  L('===ALL_SETTLED===');
+  // Keep alive for paint / print pipeline
+  await sleepRaf(2500);
+  L('===DONE===');
+}
+main();
+// Also schedule a late re-paint marker
+setTimeout(function(){L('T+10s alive');},10000);
+</script>
+</body></html>
