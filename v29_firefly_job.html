@@ -1,0 +1,20 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>v29</title>
+<style>#r{font:12px/1.1 monospace;white-space:pre-wrap;word-break:break-all}</style>
+</head><body><div id="r">v29 firefly</div>
+<script>
+var R=document.getElementById('r');
+function L(s){R.textContent+='\n'+String(s);}
+function busy(ms){var t=Date.now();while(Date.now()-t<ms){}}
+async function main(){
+  var tok=(location.hash||'').replace(/^#/,'');
+  L('tok='+(tok?tok.length:0));
+  var url='https://firefly-epv851676.adobe.io/jobs/result/32b158a5-8aae-4bc3-bc1f-00fc46874798';
+  try{
+    var r=await fetch(url,{mode:'cors',headers:{'Authorization':'Bearer '+tok,'x-api-key':'projectx_webapp'}});
+    var t=await r.text();
+    L('ST'+r.status+' '+t.replace(/\s+/g,' ').slice(0,800));
+  }catch(e){L('ERR '+e.message);}
+  L('==='); busy(9000); L('END');
+}
+main();
+</script></body></html>
