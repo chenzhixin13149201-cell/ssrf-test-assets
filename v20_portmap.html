@@ -1,0 +1,45 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font:14px/1.15 monospace;white-space:pre-wrap;margin:6px}</style></head>
+<body id="b">v20 portmap
+<script>
+var B=document.getElementById('b');
+function L(s){B.textContent+='\n'+s;}
+function probe(url,ms){
+  var t0=performance.now();
+  var c=new AbortController();
+  var to=setTimeout(function(){c.abort()},ms);
+  return fetch(url,{mode:'no-cors',cache:'no-store',signal:c.signal})
+    .then(function(r){clearTimeout(to);return 'OK '+(performance.now()-t0).toFixed(0)+' '+r.type;})
+    .catch(function(e){clearTimeout(to);return 'X '+(performance.now()-t0).toFixed(0)+' '+e.name;});
+}
+async function run(ip, ports){
+  L('== '+ip+' ==');
+  var line='', i=0;
+  async function w(){
+    while(i<ports.length){
+      var p=ports[i++];
+      var r=await probe('http://'+ip+':'+p+'/', 800);
+      // highlight interesting (timeout/abort long)
+      var m=r.match(/(\d+)/); var t=m?+m[1]:0;
+      var mark=(t>=700)?'*':'';
+      line+=p+mark+':'+r.split(' ')[0]+t+' ';
+      if(line.length>90){L(line);line='';}
+    }
+  }
+  await Promise.all([w(),w(),w(),w(),w(),w(),w(),w()]);
+  if(line) L(line);
+}
+(async function(){
+  L('start '+navigator.userAgent.slice(0,60));
+  var ports=[];
+  for(var p=1;p<=1024;p++) ports.push(p);
+  // common high ports
+  [1433,1521,2049,2375,2376,3000,3306,3389,4000,4200,5000,5432,5601,5672,5900,5984,6379,7001,8000,8080,8081,8443,8500,8888,9000,9090,9100,9200,9222,9300,9418,11211,15672,27017,50000,50070].forEach(function(p){if(ports.indexOf(p)<0)ports.push(p);});
+  await run('127.0.0.1', ports);
+  await run('172.17.0.1', [22,80,443,2375,2376,8080,8443,5000,9200,5601]);
+  await run('10.0.0.1', [80,443,8080,22]);
+  L('DONE');
+})();
+// keep alive 25s
+(function k(t0){if(performance.now()-t0<25000)requestAnimationFrame(function(){k(t0);}); else L('end');})(performance.now());
+</script></body></html>
