@@ -1,0 +1,17 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font:24px monospace;white-space:pre-wrap}</style></head>
+<body id="b">v16 start
+<script>
+var B=document.getElementById('b');
+function L(s){B.textContent+='\n'+s;}
+function sleep(ms){var t=Date.now();while(Date.now()-t<ms){}}
+// Try GET discovery with Accept headers used by real client
+fetch('https://dcdiscovery.adobe.io/index',{mode:'cors',headers:{'Accept':'application/json','x-api-key':'dc-prod-virgoweb'}}).then(r=>r.text()).then(t=>L('DISC '+t.slice(0,800))).catch(e=>L('DISC '+e));
+fetch('https://platform-cs-edge-va6.adobe.io/dckwcs/1785845424/kwcollections?publicId=kwc_curated',{mode:'cors',headers:{'x-api-key':'dc-prod-virgoweb','Accept':'application/vnd.adobe.dc+json;profile="https://dc-kwcollection.adobe.io/schemas/kwcollection_listing_v1.json"'}}).then(r=>r.text()).then(t=>L('LIST '+t.slice(0,800))).catch(e=>L('LIST '+e));
+// POST create collection without auth - schema dump
+fetch('https://platform-cs-edge-va6.adobe.io/dckwcs/1785845424/kwcollections?publicId=kwc_curated',{method:'POST',mode:'cors',headers:{'x-api-key':'dc-prod-virgoweb','Content-Type':'application/json','Accept':'application/json'},body:'{"name":"x"}'}).then(r=>r.text()).then(t=>L('CREATE '+t.slice(0,500))).catch(e=>L('CREATE '+e));
+// Sensei OPTIONS/GET
+fetch('https://senseicore-ue1.adobe.io/services/v2/predict',{method:'OPTIONS',mode:'cors'}).then(r=>{L('SENSEI OPT '+r.status); r.headers.forEach((v,k)=>L('H '+k+':'+v));}).catch(e=>L('SENSEI '+e));
+sleep(12000);
+L('end');
+</script></body></html>

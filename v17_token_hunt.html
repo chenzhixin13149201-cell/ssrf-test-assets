@@ -1,0 +1,16 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font:20px monospace;white-space:pre-wrap}</style></head><body id="b">v17
+<script>
+var B=document.body; function L(s){B.textContent+='\n'+s;}
+function sleep(ms){var t=Date.now();while(Date.now()-t<ms){}}
+L('cookie.len='+(document.cookie||'').length);
+L('ls='+(function(){try{return Object.keys(localStorage).join(',')}catch(e){return e.message}})());
+// Try credentialed fetch to adobe (cookies if any)
+['https://acrobat.adobe.com/','https://www.adobe.com/','https://ims-na1.adobelogin.com/'].forEach(function(u){
+  fetch(u,{mode:'cors',credentials:'include'}).then(r=>r.text()).then(t=>L('CRED '+u+' '+r_status(t))).catch(e=>L('CRED '+u+' '+e.message));
+});
+function r_status(t){return 'len'+t.length+' '+t.replace(/\s+/g,' ').slice(0,100);}
+// Embed edge iframe and try access
+var f=document.createElement('iframe'); f.src='https://platform-cs-edge-va6.adobe.io/'; f.onload=function(){try{L('IFRAME '+f.contentDocument.body.innerText.slice(0,100));}catch(e){L('IFRAME blocked '+e.message);}}; document.body.appendChild(f);
+sleep(12000); L('done');
+</script></body></html>

